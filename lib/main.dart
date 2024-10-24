@@ -29,7 +29,6 @@ Future<void> main() async {
 
   final prefs = await SharedPreferences.getInstance();
   shiftTimer.value = prefs.getInt('shiftTimer') ?? 0;
-
   runApp(const MainApp());
 }
 

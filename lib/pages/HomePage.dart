@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:enkryptia/data/enable_in_background.dart';
 import 'package:enkryptia/data/listen_location.dart';
 import 'package:enkryptia/main.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:location/location.dart' as loc;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,6 +18,7 @@ class _HomePageState extends State<HomePage> {
   Timer? _timer;
   final ListenLocation _listenLocation = ListenLocation();
   final EnableInBackground _enableInBackground = EnableInBackground();
+  final TextEditingController _otpController = TextEditingController();
 
   void _startTimer() {
     _timer?.cancel();
@@ -52,6 +55,54 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _verifyTask(Function onSubmit) async {
+    // Get the current location
+    loc.LocationData currentLocation = await location.getLocation();
+
+    // Example task location (latitude and longitude)
+    double taskLatitude = 21.164;
+    double taskLongitude = 79.083;
+
+    // Define the acceptable range in meters
+    double acceptableRange = 10.0;
+
+    // Calculate the distance between the current location and the task location
+    double distance = _calculateDistance(
+      currentLocation.latitude!,
+      currentLocation.longitude!,
+      taskLatitude,
+      taskLongitude,
+    );
+
+    // Check if the distance is within the acceptable range
+    if (distance <= acceptableRange) {
+      // Approve the task
+      onSubmit();
+      print(distance);
+      print('Task approved');
+    } else {
+      const AlertDialog(
+        title: Text("Alert! You have not verified your tast!"),
+      );
+      print(distance);
+      print('Task rejected');
+    }
+  }
+
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double R = 6371e3; // Earth radius in meters
+    double phi1 = lat1 * (3.141592653589793 / 180);
+    double phi2 = lat2 * (3.141592653589793 / 180);
+    double deltaPhi = (lat2 - lat1) * (3.141592653589793 / 180);
+    double deltaLambda = (lon2 - lon1) * (3.141592653589793 / 180);
+
+    double a = (sin(deltaPhi / 2) * sin(deltaPhi / 2)) +
+        (cos(phi1) * cos(phi2) * sin(deltaLambda / 2) * sin(deltaLambda / 2));
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    return R * c;
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -74,8 +125,40 @@ class _HomePageState extends State<HomePage> {
     FlutterBackgroundService().invoke('setAsBackground');
   }  
 
+  void _showOtpDialog(BuildContext context, Function onSubmit) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Enter task code:'),
+          content: TextField(
+            controller: _otpController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(hintText: 'Enter code'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                onSubmit();
+                Navigator.of(context).pop();
+              },
+              child: const Text('Submit'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context)  {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -127,11 +210,18 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              _startShift();
-              FlutterBackgroundService().invoke('setAsForeground');
-              _listenLocation.listenLocation();
-              },
+            // onPressed: () {
+            //   _startShift();
+            //   FlutterBackgroundService().invoke('setAsForeground');
+            //   _listenLocation.listenLocation();
+            //   },
+            onPressed:() {
+              _showOtpDialog(context, () {
+                _startShift();
+                FlutterBackgroundService().invoke('setAsForeground');
+                _listenLocation.listenLocation();
+              });
+            },
             child: const Text("Clock in"),
           ),
           ElevatedButton(
@@ -141,6 +231,33 @@ class _HomePageState extends State<HomePage> {
               _listenLocation.stopListen();
               },
             child: const Text("Clock out"),
+          ),
+
+          Column(
+            mainAxisAlignment: MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12.0),
+                child: Text("Assignment:", style: TextStyle(fontSize: 28),),
+              ),
+              ListTile(
+                leading: const Icon(Icons.location_pin, size: 48.0, color: Colors.red,),
+                title: const Text("Visit 5 locations"),
+                subtitle: Row(
+                  children: [
+                    ElevatedButton(onPressed: () {
+                      _verifyTask(() {
+                        const snackBar = SnackBar(
+                          content: Text('Task verified!'),
+                        );
+                        ScaffoldMessenger.of(context).showSnackBar(snackBar);
+                      });
+                    }, child: const Text("Verify visit"))
+                  ],
+                ),
+              )
+            ],
           ),
         ],
       ),
