@@ -2,6 +2,7 @@ import 'package:enkryptia/main.dart';
 import 'package:enkryptia/pages/HomePage.dart';
 import 'package:enkryptia/pages/Login.dart';
 import 'package:enkryptia/pages/location_history.dart';
+import 'package:enkryptia/pages/trip_history_page.dart';
 import 'package:go_router/go_router.dart';
 
 final router = GoRouter(
@@ -28,6 +29,10 @@ final router = GoRouter(
         GoRoute(
           path: 'history',
           builder: (context, state) => const LocationHistory(),
+        ),
+        GoRoute(
+          path: 'my-trips',
+          builder: (context, state) => TripHistoryPage(),
         ),
       ]
     ),

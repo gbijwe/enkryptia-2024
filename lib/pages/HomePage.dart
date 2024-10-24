@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:math';
 import 'package:enkryptia/data/enable_in_background.dart';
 import 'package:enkryptia/data/listen_location.dart';
+import 'package:enkryptia/data/salesman_trip_database_helper.dart';
 import 'package:enkryptia/main.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:location/location.dart' as loc;
-import 'package:permission_handler/permission_handler.dart';
+import 'package:location/location.dart';
+import 'package:permission_handler/permission_handler.dart' as pmh;
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 class HomePage extends StatefulWidget {
@@ -16,6 +18,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   Timer? _timer;
+  int? currentTripId;
   final ListenLocation _listenLocation = ListenLocation();
   final EnableInBackground _enableInBackground = EnableInBackground();
   final TextEditingController _otpController = TextEditingController();
@@ -36,13 +39,49 @@ class _HomePageState extends State<HomePage> {
     prefs.setInt('shiftTimer', shiftTimer.value);
   }
 
+  Future<void> _startTrip() async {
+    // Get the current location
+    loc.LocationData currentLocation = await location.getLocation();
+    String timestamp = DateTime.now().toIso8601String();
+
+    // Insert the start location into the database
+    await SalesmanTripDatabaseHelper().insertStateLocation(
+      currentLocation.latitude!,
+      currentLocation.longitude!,
+      timestamp,
+    );
+
+    // Get the ID of the inserted trip
+    final List<Map<String, dynamic>> trips = await SalesmanTripDatabaseHelper().getSalesmanTripDatabase();
+    currentTripId = trips.last['id'];
+  }
+
+  Future<void> _endTrip() async {
+    if (currentTripId != null) {
+      // Get the current location
+      loc.LocationData currentLocation = await location.getLocation();
+      String endTimestamp = DateTime.now().toIso8601String();
+
+      // Update the end location and calculate the total time spent
+      await SalesmanTripDatabaseHelper().updateEndLocationAndCalculateTime(
+        currentTripId!,
+        currentLocation.latitude!,
+        currentLocation.longitude!,
+        endTimestamp,
+      );
+
+      // Reset the current trip ID
+      currentTripId = null;
+    }
+  }
+
   Future<void> _startShift() async {
     // Request notification permission
-    final status = await Permission.notification.request();
+    final status = await pmh.Permission.notification.request();
     if (status.isGranted) {
       // Request location permission
-      final permission = await Permission.location.request();
-      if (permission == PermissionStatus.granted) {
+      final permission = await pmh.Permission.location.request();
+      if (permission == pmh.PermissionStatus.granted) {
         // Initialize and start the service
         await initializeService();
         FlutterBackgroundService().startService();
@@ -56,17 +95,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _verifyTask(Function onSubmit) async {
-    // Get the current location
     loc.LocationData currentLocation = await location.getLocation();
 
     // Example task location (latitude and longitude)
     double taskLatitude = 21.164;
     double taskLongitude = 79.083;
 
-    // Define the acceptable range in meters
-    double acceptableRange = 10.0;
+    double threshold = 10.0;
 
-    // Calculate the distance between the current location and the task location
     double distance = _calculateDistance(
       currentLocation.latitude!,
       currentLocation.longitude!,
@@ -74,9 +110,7 @@ class _HomePageState extends State<HomePage> {
       taskLongitude,
     );
 
-    // Check if the distance is within the acceptable range
-    if (distance <= acceptableRange) {
-      // Approve the task
+    if (distance <= threshold) {
       onSubmit();
       print(distance);
       print('Task approved');
@@ -175,11 +209,21 @@ class _HomePageState extends State<HomePage> {
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 18.0, left: 8.0),
-            child: Text(
-              "Time working today"
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+            const Padding(
+              padding: EdgeInsets.only(top: 18.0, left: 8.0),
+              child: Text(
+                "Time working today"
+              ),
             ),
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: IconButton(onPressed: () => context.go('/home/my-trips'), icon: const Icon(Icons.trip_origin)),
+              )
+            ]
           ),
           Center(
             child: Padding(
@@ -218,6 +262,7 @@ class _HomePageState extends State<HomePage> {
             onPressed:() {
               _showOtpDialog(context, () {
                 _startShift();
+                _startTrip();
                 FlutterBackgroundService().invoke('setAsForeground');
                 _listenLocation.listenLocation();
               });
@@ -227,6 +272,7 @@ class _HomePageState extends State<HomePage> {
           ElevatedButton(
             onPressed: () {
               _stopTimer();
+              _endTrip();
               FlutterBackgroundService().invoke('stopService');
               _listenLocation.stopListen();
               },
