@@ -1,7 +1,6 @@
 import 'package:enkryptia/main.dart';
 import 'package:enkryptia/pages/HomePage.dart';
 import 'package:enkryptia/pages/Login.dart';
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 final router = GoRouter(
@@ -23,7 +22,7 @@ final router = GoRouter(
     ),
     GoRoute(
       path: '/home',
-      builder: (context, state) => const Homepage(),
+      builder: (context, state) => HomePage(),
     ),
   ] 
 );
