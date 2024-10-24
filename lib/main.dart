@@ -7,7 +7,6 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
 final ValueNotifier<int> shiftTimer = ValueNotifier<int>(0);
 
 Future<void> main() async {
@@ -78,25 +77,6 @@ void onStart(ServiceInstance service) async {
           content: "Time on the clock: ${shiftTimer.value ~/ 3600}:${shiftTimer.value ~/ 60}:${(shiftTimer.value % 60).toString().padLeft(2, '0')}",
         );
       }
-    }
-  });
-
-  bg.BackgroundGeolocation.onLocation((bg.Location location) {
-    debugPrint('[location] - $location');
-  });
-
-  bg.BackgroundGeolocation.onMotionChange((bg.Location location) {
-    debugPrint('[motionchange] - $location');
-  });
-
-  bg.BackgroundGeolocation.ready(bg.Config(
-    desiredAccuracy: bg.Config.DESIRED_ACCURACY_HIGH,
-    distanceFilter: 5.0,
-    stopOnTerminate: false,
-    startOnBoot: true,
-  )).then((bg.State state) {
-    if (!state.enabled) {
-      bg.BackgroundGeolocation.start();
     }
   });
 }

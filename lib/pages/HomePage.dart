@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_background_geolocation/flutter_background_geolocation.dart' as bg;
 class HomePage extends StatefulWidget {
   @override
   _HomePageState createState() => _HomePageState();
@@ -40,7 +39,6 @@ class _HomePageState extends State<HomePage> {
         await initializeService();
         FlutterBackgroundService().startService();
         _startTimer();
-        bg.BackgroundGeolocation.start();
       } else {
         debugPrint("Location permission not granted");
       }
