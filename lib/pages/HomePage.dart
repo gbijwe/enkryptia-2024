@@ -77,35 +77,53 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text("Dashboard", style: TextStyle(color: Colors.red, fontWeight: FontWeight.w300)),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text("SalesPath", style: TextStyle(color: Colors.red, fontWeight: FontWeight.w300)), 
+            IconButton(onPressed: () {context.go('/home/history');}, icon: const Icon(Icons.history))],),
+        elevation: 3.0,
+        shadowColor: Colors.red,
+        backgroundColor: Colors.white,
       ),
       body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 18.0, left: 8.0),
+            child: Text(
+              "Time working today"
+            ),
+          ),
           Center(
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: 200,
-                  height: 200,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.blue,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: 200,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(color: Colors.red, width: 3.0)
+                    ),
                   ),
-                ),
-                ValueListenableBuilder<int>(
-                  valueListenable: shiftTimer,
-                  builder: (context, value, child) {
-                    return Text(
-                      "${(value ~/ 3600).toString().padLeft(2, '0')}:${((value ~/ 60) % 60).toString().padLeft(2, '0')}:${(value % 60).toString().padLeft(2, '0')}",
-                      style: const TextStyle(fontSize: 40, color: Colors.white),
-                    );
-                  },
-                ),
-              ],
+                  ValueListenableBuilder<int>(
+                    builder: (context, value, child) {
+                      return Text(
+                        "${(value ~/ 3600).toString().padLeft(2, '0')}:${((value ~/ 60) % 60).toString().padLeft(2, '0')}:${(value % 60).toString().padLeft(2, '0')}",
+                        style: const TextStyle(fontSize: 34, color: Colors.black),
+                      );
+                    },
+                    valueListenable: shiftTimer,
+                  ),
+                ],
+              ),
             ),
           ),
           ElevatedButton(
@@ -114,7 +132,7 @@ class _HomePageState extends State<HomePage> {
               FlutterBackgroundService().invoke('setAsForeground');
               _listenLocation.listenLocation();
               },
-            child: const Text("Start shift"),
+            child: const Text("Clock in"),
           ),
           ElevatedButton(
             onPressed: () {
@@ -122,19 +140,15 @@ class _HomePageState extends State<HomePage> {
               FlutterBackgroundService().invoke('stopService');
               _listenLocation.stopListen();
               },
-            child: const Text("Stop shift"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              context.go('/home/history');
-              },
-            child: const Text("See history"),
+            child: const Text("Clock out"),
           ),
         ],
       ),
     );
   }
 }
+
+
 // import 'dart:async';
 
 // import 'package:enkryptia/main.dart';
