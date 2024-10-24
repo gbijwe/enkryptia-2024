@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'package:enkryptia/data/enable_in_background.dart';
+import 'package:enkryptia/data/listen_location.dart';
 import 'package:enkryptia/main.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +14,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   Timer? _timer;
+  final ListenLocation _listenLocation = ListenLocation();
+  final EnableInBackground _enableInBackground = EnableInBackground();
 
   void _startTimer() {
     _timer?.cancel();
@@ -54,6 +59,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _initServices();
+  }
+
+  Future<void> _initServices() async {
+    if (await _listenLocation.checkPermissions() == false) {
+      await _listenLocation.requestPermission();
+    }
+    if (await _enableInBackground.checkBackgroundMode()) {
+      await _enableInBackground.toggleBackgroundMode();
+    }
+    FlutterBackgroundService().invoke('setAsBackground');
+  }  
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -79,7 +100,7 @@ class _HomePageState extends State<HomePage> {
                   valueListenable: shiftTimer,
                   builder: (context, value, child) {
                     return Text(
-                      "${value ~/ 3600}:${value ~/ 60}:${(value % 60).toString().padLeft(2, '0')}",
+                      "${(value ~/ 3600).toString().padLeft(2, '0')}:${((value ~/ 60) % 60).toString().padLeft(2, '0')}:${(value % 60).toString().padLeft(2, '0')}",
                       style: const TextStyle(fontSize: 40, color: Colors.white),
                     );
                   },
@@ -91,6 +112,7 @@ class _HomePageState extends State<HomePage> {
             onPressed: () {
               _startShift();
               FlutterBackgroundService().invoke('setAsForeground');
+              _listenLocation.listenLocation();
               },
             child: const Text("Start shift"),
           ),
@@ -98,8 +120,15 @@ class _HomePageState extends State<HomePage> {
             onPressed: () {
               _stopTimer();
               FlutterBackgroundService().invoke('stopService');
+              _listenLocation.stopListen();
               },
             child: const Text("Stop shift"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              context.go('/home/history');
+              },
+            child: const Text("See history"),
           ),
         ],
       ),

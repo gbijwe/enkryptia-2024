@@ -4,13 +4,17 @@ import 'package:enkryptia/credentials.dart';
 import 'package:enkryptia/router/router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:location/location.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-final ValueNotifier<int> shiftTimer = ValueNotifier<int>(0);
 
+final ValueNotifier<int> shiftTimer = ValueNotifier<int>(0);
+final Location location = Location();
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized(); 
+
+  // await Permission.notification.request();
 
   await Permission.notification.isDenied.then((value) {
     if (value) {
@@ -18,10 +22,15 @@ Future<void> main() async {
     }
   }); 
 
+  // await Supabase.initialize(
+  //   url: Credentials.SUPABASE_URL,
+  //   anonKey: Credentials.SUPABASE_ANON_KEY,
+  // );
   await Supabase.initialize(
     url: Credentials.SUPABASE_URL,
     anonKey: Credentials.SUPABASE_ANON_KEY,
   );
+
   final prefs = await SharedPreferences.getInstance();
   shiftTimer.value = prefs.getInt('shiftTimer') ?? 0;
 
@@ -84,8 +93,6 @@ void onStart(ServiceInstance service) async {
 void requestPermissions() async {
   var status = await Permission.location.request();
   if (status.isGranted) {
-    // Permission granted, you can start the service
-    // FlutterBackgroundService().startService();
     debugPrint(status.toString());
   } else {
     // Handle the case when permission is not granted
