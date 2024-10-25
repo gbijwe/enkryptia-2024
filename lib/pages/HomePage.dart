@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:enkryptia/data/enable_in_background.dart';
+import 'package:enkryptia/data/get_assignments.dart';
 import 'package:enkryptia/data/listen_location.dart';
 import 'package:enkryptia/data/salesman_trip_database_helper.dart';
 import 'package:enkryptia/main.dart';
+import 'package:enkryptia/requests/map_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:location/location.dart' as loc;
@@ -23,7 +25,8 @@ class _HomePageState extends State<HomePage> {
   final EnableInBackground _enableInBackground = EnableInBackground();
   final TextEditingController _otpController = TextEditingController();
   ValueNotifier<bool> isClockedIn = ValueNotifier<bool>(false);
-
+  late Future<List<Map<String, dynamic>>> _assignments;
+  
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) async {
@@ -62,7 +65,7 @@ class _HomePageState extends State<HomePage> {
       // Get the current location
       loc.LocationData currentLocation = await location.getLocation();
       String endTimestamp = DateTime.now().toIso8601String();
-
+      
       // Update the end location and calculate the total time spent
       await SalesmanTripDatabaseHelper().updateEndLocationAndCalculateTime(
         currentTripId!,
@@ -95,14 +98,13 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _verifyTask(Function onSubmit) async {
+  Future<void> _verifyTask(double lat, double long, Function onSubmit) async {
     loc.LocationData currentLocation = await location.getLocation();
 
-    // Example task location (latitude and longitude)
-    double taskLatitude = 21.164;
-    double taskLongitude = 79.083;
+    double taskLatitude = lat;
+    double taskLongitude = long;
 
-    double threshold = 10.0;
+    double threshold = 200.0;
 
     double distance = _calculateDistance(
       currentLocation.latitude!,
@@ -148,6 +150,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _initServices();
+     _assignments = getAssignments();
   }
 
   Future<void> _initServices() async {
@@ -191,6 +194,16 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Future<String?> _getEndTime(int assignmentId) async {
+    final response = await supabase.from('goals').select('end_time').eq('id', assignmentId).single();
+    return response['end_time'];
+  }
+
+  Future<void> _refreshAssignments() async {
+    setState(() {
+      _assignments = getAssignments();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -227,8 +240,8 @@ class _HomePageState extends State<HomePage> {
                       color: Colors.grey[700],
                       fontWeight: FontWeight.w400),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.trip_origin, color: Colors.pink),
+                TextButton(
+                  child: Text("My trips".toUpperCase(), style: const TextStyle(color: Colors.pink, ),),
                   onPressed: () {
                     context.go('/home/my-trips'); // Navigate to the trip history page
                   },
@@ -284,164 +297,176 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                _showOtpDialog(context, () {
-                  _startShift();
-                  _startTrip();
-                  isClockedIn.value = true;  // Set the state to "clocked in"
-                  FlutterBackgroundService().invoke('setAsForeground');
-                  _listenLocation.listenLocation();
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.redAccent,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                elevation: 5,
-              ),
-              child: const Text("Clock in", style: TextStyle(fontSize: 16)),
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: () {
-                _showOtpDialog(context, () {
-                  _stopTimer();
-                  _endTrip();
-                  isClockedIn.value = false;  // Set the state to "clocked out"
-                  FlutterBackgroundService().invoke('stopService');
-                  _listenLocation.stopListen();
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.grey[600],
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                elevation: 5,
-              ),
-              child: const Text("Clock out", style: TextStyle(fontSize: 16)),
-            ),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(Icons.location_pin,
-                  size: 48.0, color: Colors.redAccent),
-              title: const Text("Visit 5 locations",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              subtitle: ElevatedButton(
-                onPressed: () {
-                  _verifyTask(() {
-                    const snackBar = SnackBar(
-                      content: Text('Task verified!'),
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(snackBar);
-                  });
-                },
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: Colors.white,
-                  backgroundColor: Colors.greenAccent[400],
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                ElevatedButton(
+                  onPressed: () {
+                    _showOtpDialog(context, () {
+                      _startShift();
+                      _startTrip();
+                      isClockedIn.value = true;  // Set the state to "clocked in"
+                      FlutterBackgroundService().invoke('setAsForeground');
+                      _listenLocation.listenLocation();
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: Colors.redAccent,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    elevation: 5,
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 18.0),
+                    child: Text("Clock in", style: TextStyle(fontSize: 16)),
+                  ),
                 ),
-                child: const Text("Verify visit"),
+
+                const SizedBox(width: 20),
+                
+                ElevatedButton(
+                  onPressed: () {
+                    _showOtpDialog(context, () {
+                      _stopTimer();
+                      _endTrip();
+                      isClockedIn.value = false;  // Set the state to "clocked out"
+                      FlutterBackgroundService().invoke('stopService');
+                      _listenLocation.stopListen();
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: Colors.grey[600],
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    elevation: 5,
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 18.0),
+                    child: Text("Clock out", style: TextStyle(fontSize: 16)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 30),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Text("Tasks!", style: TextStyle(fontSize: 24.0),), 
+                IconButton(onPressed: _refreshAssignments, icon: const Icon(Icons.refresh))
+              ],
+            ),
+
+            Expanded(
+              child: FutureBuilder<List<Map<String, dynamic>>>(
+                future: _assignments,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(child: Text('No assignments found.'));
+                  } else {
+                    final assignments = snapshot.data!;
+                    return ListView.builder(
+                      itemCount: assignments.length,
+                      itemBuilder: (context, index) {
+                        final assignment = assignments[index];
+                        return FutureBuilder<String?>(
+                          future: _getEndTime(assignment['id']),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return const Center(child: CircularProgressIndicator());
+                            } else if (snapshot.hasError) {
+                              return Center(child: Text('Error: ${snapshot.error}'));
+                            } else {
+                              final endTime = snapshot.data;
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                child: PhysicalModel(
+                                  elevation: 5.0,
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(5),
+                                  child: ListTile(
+                                    onTap: () {
+                                      try {
+                                        MapUtils.openMap(assignment['lat'].toDouble(), assignment['long'].toDouble());
+                                      } catch (e) {
+                                        print('Error opening map: $e');
+                                      }
+                                    },
+                                    leading: endTime != null ? const Icon(Icons.check_circle_outline_sharp, color: Colors.green,) : const Icon(Icons.location_on, size: 32, color: Colors.red),
+                                    title: Text(
+                                      assignment['goal'],
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                    subtitle: endTime != null
+                                        ? Text('Completed at: $endTime')
+                                        : Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            crossAxisAlignment: CrossAxisAlignment.center,
+                                            children: [
+                                              Column(
+                                                children: [
+                                                  Text(
+                                                    'Latitude: ${assignment['lat']}',
+                                                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                                                  ),
+                                                  Text(
+                                                    'Longitude: ${assignment['long']}',
+                                                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                                                  ),
+                                                ],
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () {
+                                                  const snackBar = SnackBar(
+                                                    content: Text('Verifying task now.'),
+                                                  );
+                                                  ScaffoldMessenger.of(context).showSnackBar(snackBar);
+                                                  _verifyTask(assignment['lat'].toDouble(), assignment['long'].toDouble(), 
+                                                  () async {
+                                                    await supabase.from('goals').update({'end_time': DateTime.now().toIso8601String()}).eq('id', assignment['id']);
+                                                    await _refreshAssignments();
+                                                  });
+                                                },
+                                                style: ButtonStyle(
+                                                  // backgroundColor: WidgetStateProperty.all(Colors.white),
+                                                  padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 10)),
+                                                  shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(5), side: const BorderSide(color: Colors.red, style: BorderStyle.solid))),
+                                                  
+                                                ),
+                                                child: const Padding(
+                                                  padding:  EdgeInsets.symmetric(horizontal: 5.0),
+                                                  child:  Text("Verify task"),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        );
+                      },
+                    );
+                  }
+                },
               ),
-            )
+            ),
           ],
         ),
       ),
     );
   }
 }
-
-
-// import 'dart:async';
-
-// import 'package:enkryptia/main.dart';
-// import 'package:flutter/material.dart';
-// import 'package:flutter_background_service/flutter_background_service.dart';
-
-// class Homepage extends StatefulWidget {
-//   const Homepage({super.key});
-
-//   @override
-//   State<Homepage> createState() => _HomepageState();
-// }
-
-// class _HomepageState extends State<Homepage> {
-//    Timer? _timer;
-//   int _seconds = 0;
-
-//   void _startTimer() {
-//     _timer?.cancel();
-//     _seconds = 0;
-//     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-//       setState(() {
-//         _seconds++;
-//       });
-//     });
-//   }
-
-//   void _stopTimer() {
-//     _timer?.cancel();
-//   }
-
-//   @override
-//   void dispose() {
-//     _timer?.cancel();
-//     super.dispose();
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: const Text("Dashboard", style: TextStyle(color: Colors.red, fontWeight: FontWeight.w300),),
-//       ),
-//       body: Column(
-//         mainAxisAlignment: MainAxisAlignment.center,
-//         crossAxisAlignment: CrossAxisAlignment.stretch,
-//         children: [
-//           Center(
-//             child: Stack(
-//               alignment: Alignment.center,
-//               children: [
-//                 Container(
-//                   width: 200,
-//                   height: 200,
-//                   decoration: const BoxDecoration(
-//                     shape: BoxShape.circle,
-//                     color: Colors.blue,
-//                   ),
-//                 ),
-//                 Text(
-//                   "${_seconds ~/ 60}:${(_seconds % 60).toString().padLeft(2, '0')}",
-//                   style: const TextStyle(fontSize: 40, color: Colors.white),
-//                 ),
-//               ],
-//             ),
-//           ),
-//           ElevatedButton(onPressed: () {
-//             FlutterBackgroundService().invoke('setAsForeground');
-//           }, child: const Text("Set foreground")),
-//           ElevatedButton(
-//             onPressed: () {
-//               requestPermissions();
-//               FlutterBackgroundService().startService();
-//               _startTimer();
-//             },
-//             child: const Text("Start shift!")
-//           ),
-//           ElevatedButton(
-//             onPressed: () {
-//               // service.stopService();
-//               _stopTimer();
-//             },
-//             child: const Text("Stop service"))
-//         ],
-//       ),
-//     );
-//   }
-// }
