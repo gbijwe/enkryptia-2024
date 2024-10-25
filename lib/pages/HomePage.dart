@@ -22,6 +22,7 @@ class _HomePageState extends State<HomePage> {
   final ListenLocation _listenLocation = ListenLocation();
   final EnableInBackground _enableInBackground = EnableInBackground();
   final TextEditingController _otpController = TextEditingController();
+  ValueNotifier<bool> isClockedIn = ValueNotifier<bool>(false);
 
   void _startTimer() {
     _timer?.cancel();
@@ -157,7 +158,7 @@ class _HomePageState extends State<HomePage> {
       await _enableInBackground.toggleBackgroundMode();
     }
     FlutterBackgroundService().invoke('setAsBackground');
-  }  
+  }
 
   void _showOtpDialog(BuildContext context, Function onSubmit) {
     showDialog(
@@ -192,59 +193,89 @@ class _HomePageState extends State<HomePage> {
 
 
   @override
-  Widget build(BuildContext context)  {
+  Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text("SalesPath", style: TextStyle(color: Colors.red, fontWeight: FontWeight.w300)), 
-            IconButton(onPressed: () {context.go('/home/history');}, icon: const Icon(Icons.history))],),
-        elevation: 3.0,
-        shadowColor: Colors.red,
+            const Text("SalesPath",
+                style: TextStyle(
+                    color: Colors.red, fontWeight: FontWeight.bold, fontSize: 24)),
+            IconButton(onPressed: () {
+              context.go('/home/history'); // Assuming you're using go_router for navigation
+            }, icon: const Icon(Icons.history, color: Colors.black)),
+          ],
+        ),
         backgroundColor: Colors.white,
+        elevation: 3.0,
+        shadowColor: Colors.grey.withOpacity(0.5),
       ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-            const Padding(
-              padding: EdgeInsets.only(top: 18.0, left: 8.0),
-              child: Text(
-                "Time working today"
-              ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "Time working today",
+                  style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w400),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.trip_origin, color: Colors.pink),
+                  onPressed: () {
+                    context.go('/home/my-trips'); // Navigate to the trip history page
+                  },
+                ),
+              ],
             ),
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: IconButton(onPressed: () => context.go('/home/my-trips'), icon: const Icon(Icons.trip_origin)),
-              )
-            ]
-          ),
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+            const SizedBox(height: 20),
+            Center(
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  Container(
-                    width: 200,
-                    height: 200,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                      border: Border.all(color: Colors.red, width: 3.0)
-                    ),
+                  // Color-changing circle container
+                  ValueListenableBuilder<bool>(
+                    valueListenable: isClockedIn,
+                    builder: (context, isRunning, child) {
+                      return Container(
+                        width: 220,
+                        height: 220,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: isRunning
+                                ? [Colors.greenAccent, Colors.lightGreen]
+                                : [Colors.redAccent, Colors.pinkAccent],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.5),
+                              spreadRadius: 5,
+                              blurRadius: 15,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                   ValueListenableBuilder<int>(
                     builder: (context, value, child) {
                       return Text(
                         "${(value ~/ 3600).toString().padLeft(2, '0')}:${((value ~/ 60) % 60).toString().padLeft(2, '0')}:${(value % 60).toString().padLeft(2, '0')}",
-                        style: const TextStyle(fontSize: 34, color: Colors.black),
+                        style: const TextStyle(
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white),
                       );
                     },
                     valueListenable: shiftTimer,
@@ -252,60 +283,74 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
             ),
-          ),
-          ElevatedButton(
-            // onPressed: () {
-            //   _startShift();
-            //   FlutterBackgroundService().invoke('setAsForeground');
-            //   _listenLocation.listenLocation();
-            //   },
-            onPressed:() {
-              _showOtpDialog(context, () {
-                _startShift();
-                _startTrip();
-                FlutterBackgroundService().invoke('setAsForeground');
-                _listenLocation.listenLocation();
-              });
-            },
-            child: const Text("Clock in"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              _stopTimer();
-              _endTrip();
-              FlutterBackgroundService().invoke('stopService');
-              _listenLocation.stopListen();
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                _showOtpDialog(context, () {
+                  _startShift();
+                  _startTrip();
+                  isClockedIn.value = true;  // Set the state to "clocked in"
+                  FlutterBackgroundService().invoke('setAsForeground');
+                  _listenLocation.listenLocation();
+                });
               },
-            child: const Text("Clock out"),
-          ),
-
-          Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12.0),
-                child: Text("Assignment:", style: TextStyle(fontSize: 28),),
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.redAccent,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                elevation: 5,
               ),
-              ListTile(
-                leading: const Icon(Icons.location_pin, size: 48.0, color: Colors.red,),
-                title: const Text("Visit 5 locations"),
-                subtitle: Row(
-                  children: [
-                    ElevatedButton(onPressed: () {
-                      _verifyTask(() {
-                        const snackBar = SnackBar(
-                          content: Text('Task verified!'),
-                        );
-                        ScaffoldMessenger.of(context).showSnackBar(snackBar);
-                      });
-                    }, child: const Text("Verify visit"))
-                  ],
+              child: const Text("Clock in", style: TextStyle(fontSize: 16)),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: () {
+                _showOtpDialog(context, () {
+                  _stopTimer();
+                  _endTrip();
+                  isClockedIn.value = false;  // Set the state to "clocked out"
+                  FlutterBackgroundService().invoke('stopService');
+                  _listenLocation.stopListen();
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.grey[600],
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                elevation: 5,
+              ),
+              child: const Text("Clock out", style: TextStyle(fontSize: 16)),
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: const Icon(Icons.location_pin,
+                  size: 48.0, color: Colors.redAccent),
+              title: const Text("Visit 5 locations",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              subtitle: ElevatedButton(
+                onPressed: () {
+                  _verifyTask(() {
+                    const snackBar = SnackBar(
+                      content: Text('Task verified!'),
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(snackBar);
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.greenAccent[400],
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
-              )
-            ],
-          ),
-        ],
+                child: const Text("Verify visit"),
+              ),
+            )
+          ],
+        ),
       ),
     );
   }
@@ -348,7 +393,7 @@ class _HomePageState extends State<HomePage> {
 //     _timer?.cancel();
 //     super.dispose();
 //   }
-  
+
 //   @override
 //   Widget build(BuildContext context) {
 //     return Scaffold(
@@ -386,14 +431,14 @@ class _HomePageState extends State<HomePage> {
 //               requestPermissions();
 //               FlutterBackgroundService().startService();
 //               _startTimer();
-//             }, 
+//             },
 //             child: const Text("Start shift!")
 //           ),
 //           ElevatedButton(
 //             onPressed: () {
 //               // service.stopService();
 //               _stopTimer();
-//             }, 
+//             },
 //             child: const Text("Stop service"))
 //         ],
 //       ),
